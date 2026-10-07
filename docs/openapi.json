@@ -1,0 +1,1010 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AnimeGO TV API",
+    "version": "1.0.0",
+    "description": "API для Android / Google TV клиента.\n\nСценарий: поиск → карточка аниме → доступные серии → перевод и плеер → свежий playback → Media3.\n\nВсе ответы каталога и playback обёрнуты в data; ошибки имеют вид {\"error\":\"...\"}. Пустые списки возвращаются как [], необязательные поля отсутствуют вместо null. Все идентификаторы передавайте как строки. Авторизация в текущем backend не реализована.\n\nСсылки playback получайте по запросу перед стартом видео и не сохраняйте надолго. Применяйте sources[].headers, если они есть. Поддерживаются AniBoom, Kodik и CVH: HLS/DASH без защиты и прямые MP4 CVH. История просмотра, избранное, авторизация, главная витрина и пагинация API пока отсутствуют."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Текущий сервер Swagger UI. Для TV используйте адрес backend в вашей сети."
+    }
+  ],
+  "security": [],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Состояние backend"
+    },
+    {
+      "name": "Anime",
+      "description": "Поиск и карточка аниме"
+    },
+    {
+      "name": "Episodes",
+      "description": "Серии, переводы и выбор плеера"
+    },
+    {
+      "name": "Playback",
+      "description": "Прямые источники для Media3"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "getHealth",
+        "summary": "Проверка здоровья процесса",
+        "description": "Возвращает состояние процесса. Не обращается к AnimeGO или медиапровайдерам и не проверяет их доступность.",
+        "responses": {
+          "200": {
+            "description": "Сервер работает",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "ok"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/anime/search": {
+      "get": {
+        "tags": [
+          "Anime"
+        ],
+        "operationId": "searchAnime",
+        "summary": "Поиск аниме",
+        "description": "Строка q очищается от пробелов по краям; затем проверяются UTF-8 и длина 1–200 Unicode-кодовых точек. Пустой результат: {\"data\":[]}. Пагинация и фильтры в этом API не реализованы.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Поисковый запрос: 1–200 Unicode-кодовых точек после удаления пробелов по краям. Кириллица поддерживается.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "solo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Список найденных аниме; может быть пустым",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnimeSearchResponse"
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": "podnyatie-urovnya-v-odinochku-s1-2477",
+                      "title": "Поднятие уровня в одиночку",
+                      "alt_title": "Ore dake Level Up na Ken",
+                      "poster": "https://img.cdngos.com/v/250x350/anime/67/676487b86d5c0521559278",
+                      "year": 2024
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidQuery"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "502": {
+            "$ref": "#/components/responses/CatalogUpstream"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/anime/{id}": {
+      "get": {
+        "tags": [
+          "Anime"
+        ],
+        "operationId": "getAnime",
+        "summary": "Карточка аниме",
+        "description": "Метаданные для экрана аниме. Необязательные поля отсутствуют, если провайдер их не сообщил. episode_count — данные каталога, включая запланированные серии; для доступных серий используйте getEpisodes.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AnimeID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Карточка аниме",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnimeDetailsResponse"
+                },
+                "example": {
+                  "data": {
+                    "id": "podnyatie-urovnya-v-odinochku-s1-2477",
+                    "title": "Поднятие уровня в одиночку",
+                    "alt_title": "Ore dake Level Up na Ken",
+                    "poster": "https://img.cdngos.com/v/250x350/anime/67/676487b86d5c0521559278",
+                    "year": 2024,
+                    "description": "История охотника, который получает возможность повышать свой уровень.",
+                    "type": "ТВ Сериал",
+                    "genres": [
+                      "Экшен",
+                      "Фэнтези"
+                    ],
+                    "episode_count": 12
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidCatalogID"
+          },
+          "404": {
+            "$ref": "#/components/responses/AnimeNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "502": {
+            "$ref": "#/components/responses/CatalogUpstream"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/anime/{id}/episodes": {
+      "get": {
+        "tags": [
+          "Episodes"
+        ],
+        "operationId": "getEpisodes",
+        "summary": "Доступные серии",
+        "description": "Все доступные серии, собранные со всех страниц провайдера и отсортированные по номеру. Серии могут отличаться от episode_count карточки. Если у аниме нет онлайн-плеера, возвращается {\"data\":[]}. Названия серий текущий провайдер не сообщает.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AnimeID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Список доступных серий; может быть пустым",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpisodesResponse"
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": "32410",
+                      "number": 1
+                    },
+                    {
+                      "id": "32411",
+                      "number": 2
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidCatalogID"
+          },
+          "404": {
+            "$ref": "#/components/responses/AnimeNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "502": {
+            "$ref": "#/components/responses/CatalogUpstream"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/anime/{id}/episodes/{episodeID}/translations": {
+      "get": {
+        "tags": [
+          "Episodes"
+        ],
+        "operationId": "getTranslations",
+        "summary": "Переводы и плееры серии",
+        "description": "Сервер проверяет, что серия принадлежит аниме, и читает актуальный список переводов и плееров. Один перевод может иметь несколько плееров. Идентификаторы копируйте из ответа как строки. Для воспроизведения выбирайте provider=aniboom, kodik или cvh. Неизвестные плееры и недоступные выбранные источники возвращают 422. Пустой список: {\"data\":[]}.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AnimeID"
+          },
+          {
+            "$ref": "#/components/parameters/EpisodeID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Переводы с вложенными плеерами; может быть пустым",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationsResponse"
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": "67",
+                      "name": "Amber",
+                      "players": [
+                        {
+                          "id": "32410:67:26",
+                          "provider": "cvh",
+                          "name": "CVH"
+                        },
+                        {
+                          "id": "32410:67:24",
+                          "provider": "aniboom",
+                          "name": "AniBoom"
+                        },
+                        {
+                          "id": "32410:67:19",
+                          "provider": "kodik",
+                          "name": "Kodik"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidCatalogID"
+          },
+          "404": {
+            "$ref": "#/components/responses/CatalogNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "502": {
+            "$ref": "#/components/responses/CatalogUpstream"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/anime/{id}/episodes/{episodeID}/players/{playerID}/playback": {
+      "get": {
+        "tags": [
+          "Playback"
+        ],
+        "operationId": "getPlayback",
+        "summary": "Получить свежий источник для Media3",
+        "description": "Вызывайте непосредственно перед воспроизведением. Сервер повторно проверяет серию и выбранный плеер, затем получает прямые HLS/DASH/MP4 URL для AniBoom, Kodik или CVH. Ответы имеют Cache-Control: no-store, ссылки могут быть временными. Backend не передаёт видеосегменты: Media3 загружает их напрямую с CDN. HLS предпочтителен, DASH используется при отсутствии HLS. Kodik возвращает HLS по качествам; CVH возвращает MP4 по качествам, когда HLS/DASH отсутствуют. Источники с явным качеством упорядочены от высокого к низкому. CVH сохраняет выбранные эпизод и озвучку. Некоторые URL привязаны к публичному IP; backend и TV могут нуждаться в одном адресе выхода в интернет. Защищённые HLS/DASH и неподдерживаемые плееры возвращают 422. Пример URL синтетический и не предназначен для просмотра.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AnimeID"
+          },
+          {
+            "$ref": "#/components/parameters/EpisodeID"
+          },
+          {
+            "$ref": "#/components/parameters/PlayerID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Свежие источники для воспроизведения",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaybackResponse"
+                },
+                "example": {
+                  "data": {
+                    "anime_id": "podnyatie-urovnya-v-odinochku-s1-2477",
+                    "episode_id": "32410",
+                    "translation_id": "67",
+                    "player_id": "32410:67:24",
+                    "sources": [
+                      {
+                        "type": "hls",
+                        "url": "https://ella.ya-ligh123.site/sample/master.m3u8",
+                        "quality": "auto"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidPlaybackID"
+          },
+          "404": {
+            "$ref": "#/components/responses/PlaybackNotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnsupportedPlayback"
+          },
+          "500": {
+            "description": "Непредвиденная внутренняя ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "internal": {
+                    "value": {
+                      "error": "internal server error"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            }
+          },
+          "502": {
+            "$ref": "#/components/responses/PlaybackUpstream"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Состояние процесса",
+            "example": "ok",
+            "enum": [
+              "ok"
+            ]
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Публичное сообщение об ошибке. Внутренние подробности не передаются.",
+            "example": "anime not found"
+          }
+        }
+      },
+      "Anime": {
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/AnimeID"
+          },
+          "title": {
+            "type": "string",
+            "description": "Основное название",
+            "example": "Поднятие уровня в одиночку"
+          },
+          "alt_title": {
+            "type": "string",
+            "description": "Альтернативное название; отсутствует, если неизвестно",
+            "example": "Ore dake Level Up na Ken"
+          },
+          "poster": {
+            "type": "string",
+            "description": "URL постера; отсутствует, если неизвестно",
+            "example": "https://img.cdngos.com/v/250x350/anime/67/676487b86d5c0521559278",
+            "format": "uri"
+          },
+          "year": {
+            "type": "integer",
+            "description": "Год выпуска; отсутствует, если неизвестен",
+            "example": 2024
+          },
+          "status": {
+            "type": "string",
+            "description": "Статус из каталога; свободный текст, без фиксированного enum",
+            "example": "Вышел"
+          }
+        }
+      },
+      "AnimeDetails": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Anime"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "Описание сюжета"
+              },
+              "type": {
+                "type": "string",
+                "description": "Тип из каталога; свободный текст",
+                "example": "ТВ Сериал"
+              },
+              "genres": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "example": [
+                  "Экшен",
+                  "Фэнтези"
+                ]
+              },
+              "episode_count": {
+                "type": "integer",
+                "description": "Число серий по данным каталога; не означает количество доступных для просмотра серий",
+                "example": 12
+              }
+            }
+          }
+        ]
+      },
+      "Episode": {
+        "type": "object",
+        "required": [
+          "id",
+          "number"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/EpisodeID"
+          },
+          "number": {
+            "type": "integer",
+            "description": "Номер серии",
+            "example": 1
+          },
+          "title": {
+            "type": "string",
+            "description": "Необязательное название. Текущий провайдер не заполняет это поле."
+          }
+        }
+      },
+      "Translation": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "players"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Непрозрачный идентификатор перевода. Храните как строку.",
+            "example": "67"
+          },
+          "name": {
+            "type": "string",
+            "description": "Название перевода или команды",
+            "example": "Amber"
+          },
+          "type": {
+            "type": "string",
+            "description": "Тип перевода. Текущий провайдер не заполняет поле, если меню явно не различает озвучку и субтитры."
+          },
+          "players": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayerReference"
+            }
+          }
+        }
+      },
+      "PlayerReference": {
+        "type": "object",
+        "required": [
+          "id",
+          "provider"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/PlayerID"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Ключ провайдера. Воспроизведение реализовано для aniboom, kodik и cvh; меню может содержать другие значения.",
+            "example": "aniboom"
+          },
+          "name": {
+            "type": "string",
+            "description": "Отображаемое название плеера",
+            "example": "AniBoom"
+          }
+        }
+      },
+      "Playback": {
+        "type": "object",
+        "required": [
+          "anime_id",
+          "episode_id",
+          "translation_id",
+          "player_id",
+          "sources"
+        ],
+        "properties": {
+          "anime_id": {
+            "$ref": "#/components/schemas/AnimeID"
+          },
+          "episode_id": {
+            "$ref": "#/components/schemas/EpisodeID"
+          },
+          "translation_id": {
+            "type": "string",
+            "description": "Идентификатор выбранного перевода",
+            "example": "67"
+          },
+          "player_id": {
+            "$ref": "#/components/schemas/PlayerID"
+          },
+          "sources": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/VideoSource"
+            }
+          }
+        }
+      },
+      "VideoSource": {
+        "type": "object",
+        "required": [
+          "type",
+          "url"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Тип источника. hls → application/x-mpegURL, dash → application/dash+xml, mp4 → video/mp4. AniBoom возвращает HLS/DASH, Kodik — HLS, CVH — HLS/DASH или MP4.",
+            "example": "hls",
+            "enum": [
+              "hls",
+              "dash",
+              "mp4"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "description": "Прямой URL медиаресурса; может быть временным. Пример синтетический.",
+            "example": "https://ella.ya-ligh123.site/sample/master.m3u8",
+            "format": "uri"
+          },
+          "quality": {
+            "type": "string",
+            "description": "Качество; auto означает адаптивный манифест, 720 и 1080 — явное качество 720p и 1080p соответственно",
+            "example": "auto"
+          },
+          "headers": {
+            "type": "object",
+            "description": "Необязательные HTTP-заголовки для запросов Media3 к медиаресурсу. Если отсутствуют, дополнительные заголовки не нужны. В проверенных источниках дополнительные заголовки не требуются.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "Необязательное время истечения ссылки RFC 3339. Если отсутствует, срок неизвестен; это не означает бессрочность. Текущие резолверы не возвращают это поле.",
+            "example": "2026-10-04T12:00:00Z",
+            "format": "date-time"
+          }
+        }
+      },
+      "AnimeID": {
+        "type": "string",
+        "description": "Slug из ответа поиска; копируйте как строку.",
+        "example": "podnyatie-urovnya-v-odinochku-s1-2477",
+        "minLength": 1,
+        "maxLength": 300,
+        "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"
+      },
+      "EpisodeID": {
+        "type": "string",
+        "description": "Положительный числовой идентификатор без ведущих нулей, до 18 цифр. Храните как строку.",
+        "example": "32410",
+        "minLength": 1,
+        "maxLength": 18,
+        "pattern": "^[1-9][0-9]{0,17}$"
+      },
+      "PlayerID": {
+        "type": "string",
+        "description": "Непрозрачный идентификатор плеера из players[].id. Текущий формат состоит из трёх положительных числовых частей через двоеточие; первая должна совпадать с episodeID. Не собирайте идентификатор самостоятельно.",
+        "example": "32410:67:24",
+        "minLength": 5,
+        "maxLength": 56,
+        "pattern": "^[1-9][0-9]{0,17}:[1-9][0-9]{0,17}:[1-9][0-9]{0,17}$"
+      },
+      "AnimeSearchResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Anime"
+            }
+          }
+        }
+      },
+      "AnimeDetailsResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AnimeDetails"
+          }
+        }
+      },
+      "EpisodesResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Episode"
+            }
+          }
+        }
+      },
+      "TranslationsResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Translation"
+            }
+          }
+        }
+      },
+      "PlaybackResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Playback"
+          }
+        }
+      }
+    },
+    "parameters": {
+      "AnimeID": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Идентификатор аниме из поиска",
+        "schema": {
+          "$ref": "#/components/schemas/AnimeID"
+        }
+      },
+      "EpisodeID": {
+        "name": "episodeID",
+        "in": "path",
+        "required": true,
+        "description": "Идентификатор серии из getEpisodes",
+        "schema": {
+          "$ref": "#/components/schemas/EpisodeID"
+        }
+      },
+      "PlayerID": {
+        "name": "playerID",
+        "in": "path",
+        "required": true,
+        "description": "Точное значение players[].id из getTranslations. Кодируйте как сегмент URL.",
+        "schema": {
+          "$ref": "#/components/schemas/PlayerID"
+        }
+      }
+    },
+    "headers": {
+      "NoStore": {
+        "description": "Ответ playback не должен сохраняться в HTTP-кэшах.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "no-store"
+          ]
+        }
+      }
+    },
+    "responses": {
+      "InvalidQuery": {
+        "description": "Неверный или отсутствующий поисковый запрос",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "invalidQuery": {
+                "value": {
+                  "error": "q must contain 1 to 200 valid Unicode characters"
+                }
+              }
+            }
+          }
+        }
+      },
+      "InvalidCatalogID": {
+        "description": "Неверный идентификатор аниме или серии",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "invalidIdentifier": {
+                "value": {
+                  "error": "invalid anime or episode identifier"
+                }
+              }
+            }
+          }
+        }
+      },
+      "InvalidPlaybackID": {
+        "description": "Неверный идентификатор аниме, серии или плеера; первая часть playerID должна совпадать с episodeID",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "invalidIdentifier": {
+                "value": {
+                  "error": "invalid anime, episode, or player identifier"
+                }
+              }
+            }
+          }
+        },
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        }
+      },
+      "AnimeNotFound": {
+        "description": "Аниме не найдено",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "animeNotFound": {
+                "value": {
+                  "error": "anime not found"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CatalogNotFound": {
+        "description": "Аниме или серия не найдены, включая серию другого аниме",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "animeNotFound": {
+                "value": {
+                  "error": "anime not found"
+                }
+              },
+              "episodeNotFound": {
+                "value": {
+                  "error": "episode not found"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PlaybackNotFound": {
+        "description": "Аниме, серия или выбранный плеер не найдены",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "animeNotFound": {
+                "value": {
+                  "error": "anime not found"
+                }
+              },
+              "episodeNotFound": {
+                "value": {
+                  "error": "episode not found"
+                }
+              },
+              "playerNotFound": {
+                "value": {
+                  "error": "player not found"
+                }
+              }
+            }
+          }
+        },
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        }
+      },
+      "UnsupportedPlayback": {
+        "description": "Неподдерживаемый плеер, недоступное или защищённое видео",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "unsupportedPlayer": {
+                "value": {
+                  "error": "player is not supported"
+                }
+              },
+              "unavailable": {
+                "value": {
+                  "error": "playback is unavailable"
+                }
+              }
+            }
+          }
+        },
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        }
+      },
+      "CatalogUpstream": {
+        "description": "Ошибка, тайм-аут, слишком большой ответ или неожиданная разметка каталога",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "upstream": {
+                "value": {
+                  "error": "anime catalog is temporarily unavailable"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PlaybackUpstream": {
+        "description": "Ошибка каталога или плеера, тайм-аут либо неожиданный ответ при получении playback",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "upstream": {
+                "value": {
+                  "error": "playback provider is temporarily unavailable"
+                }
+              }
+            }
+          }
+        },
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Непредвиденная внутренняя ошибка",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "internal": {
+                "value": {
+                  "error": "internal server error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Лимит параллельных запросов исчерпан. Повторите запрос через указанное число секунд.",
+        "headers": {
+          "Retry-After": {
+            "description": "Число секунд до повторного запроса.",
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": "server is busy; retry shortly"
+            }
+          }
+        }
+      }
+    }
+  }
+}

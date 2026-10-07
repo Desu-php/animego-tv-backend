@@ -1,0 +1,46 @@
+# Go build artifacts
+/bin/
+/dist/
+/api
+/backend
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Test coverage and profiling
+/coverage/
+coverage.out
+coverage-*.out
+coverage.html
+*.prof
+
+# Local environment (keep shareable examples)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Generated graphify skill output at any directory depth
+graphify-out/
+graphity-out/
+
+# Temporary files and logs
+.tmp/
+*.log
+*.tmp
+
+# Editor and IDE settings
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini

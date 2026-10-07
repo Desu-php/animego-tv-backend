@@ -1,0 +1,22 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      HTTP_ADDR: ":8080"
+      ANIMEGO_BASE_URL: "${ANIMEGO_BASE_URL:-https://animego.me}"
+      ANIMEGO_TIMEOUT: "${ANIMEGO_TIMEOUT:-10s}"
+      PLAYER_TIMEOUT: "${PLAYER_TIMEOUT:-10s}"
+      CATALOG_CACHE_CAPACITY: "${CATALOG_CACHE_CAPACITY:-128}"
+      CATALOG_DETAILS_TTL: "${CATALOG_DETAILS_TTL:-2m}"
+      CATALOG_EPISODES_TTL: "${CATALOG_EPISODES_TTL:-15s}"
+      CATALOG_CONCURRENCY: "${CATALOG_CONCURRENCY:-16}"
+      PLAYBACK_CONCURRENCY: "${PLAYBACK_CONCURRENCY:-4}"
+    init: true
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
