@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"animego/backend/internal/domain"
@@ -15,51 +14,32 @@ import (
 
 const MaxManifestBytes int64 = 256 << 10
 
-var hlsURIAttribute = regexp.MustCompile(`(?:^|[:,])URI="([^"]+)"`)
-
 // ValidateManifest checks an adaptive HLS/DASH manifest or a quality-specific HLS playlist.
 // Referenced media is validated without downloading any video segments.
 func ValidateManifest(data []byte, source *domain.VideoSource, requireMaster bool) error {
+	_, err := validateManifest(data, source, requireMaster)
+	return err
+}
+
+// validateManifest returns only child playlists; segment URLs are validated but
+// never returned to the traversal or fetched by the backend.
+func validateManifest(data []byte, source *domain.VideoSource, requireMaster bool) ([]string, error) {
+	if int64(len(data)) > MaxManifestBytes {
+		return nil, fmt.Errorf("%w: manifest exceeds size limit", provider.ErrParsing)
+	}
 	if source == nil {
-		return fmt.Errorf("%w: missing manifest source", provider.ErrParsing)
+		return nil, fmt.Errorf("%w: missing manifest source", provider.ErrParsing)
 	}
 	if _, err := ValidateMediaURL(source.URL); err != nil {
-		return fmt.Errorf("%w: invalid manifest URL", provider.ErrParsing)
+		return nil, fmt.Errorf("%w: invalid manifest URL", provider.ErrParsing)
 	}
 	if source.Type == domain.VideoDASH {
-		return validateDASH(data, source.URL)
+		return nil, validateDASH(data, source.URL)
 	}
 	if source.Type != domain.VideoHLS {
-		return fmt.Errorf("%w: unsupported manifest format", provider.ErrParsing)
+		return nil, fmt.Errorf("%w: unsupported manifest format", provider.ErrParsing)
 	}
-	text := strings.TrimSpace(strings.TrimPrefix(string(data), "\ufeff"))
-	if !strings.HasPrefix(text, "#EXTM3U\n") && !strings.HasPrefix(text, "#EXTM3U\r\n") {
-		return fmt.Errorf("%w: invalid HLS manifest", provider.ErrParsing)
-	}
-	base, _ := url.Parse(source.URL)
-	variants := 0
-	for _, line := range strings.Split(text, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "#EXT-X-KEY:") && line != "#EXT-X-KEY:METHOD=NONE" || strings.HasPrefix(line, "#EXT-X-SESSION-KEY:") {
-			return fmt.Errorf("%w: encrypted HLS is not supported", domain.ErrPlaybackUnavailable)
-		}
-		for _, attribute := range hlsURIAttribute.FindAllStringSubmatch(line, -1) {
-			if err := validateReference(base, attribute[1]); err != nil {
-				return err
-			}
-		}
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if err := validateReference(base, line); err != nil {
-			return err
-		}
-		variants++
-	}
-	if variants == 0 || requireMaster && !strings.Contains(text, "#EXT-X-STREAM-INF:") || !requireMaster && !strings.Contains(text, "#EXT-X-STREAM-INF:") && !strings.Contains(text, "#EXTINF:") {
-		return fmt.Errorf("%w: unexpected HLS playlist structure", provider.ErrParsing)
-	}
-	return nil
+	return parseHLS(data, source.URL, requireMaster)
 }
 
 func validateDASH(data []byte, rawURL string) error {

@@ -84,10 +84,23 @@ func TestCatalogCacheSharesDataButKeepsMenusFresh(t *testing.T) {
 	if _, err = client.GetTranslations(ctx, testAnimeID, "999"); err != nil {
 		t.Fatalf("new episode blocked by stale cache: %v", err)
 	}
+	episodes, err = client.GetEpisodes(ctx, testAnimeID)
+	if err != nil || len(episodes) != 2 || episodes[1].ID != "999" {
+		t.Fatalf("refreshed list was not persisted: %v, %v", episodes, err)
+	}
+	if _, err = client.GetTranslations(ctx, testAnimeID, "999"); err != nil {
+		t.Fatalf("refreshed episode was not reused: %v", err)
+	}
 	if _, err = client.GetTranslations(ctx, testAnimeID, "998"); !errors.Is(err, domain.ErrEpisodeNotFound) {
 		t.Fatalf("foreign episode accepted: %v", err)
 	}
-	if menuCalls.Load() != 3 {
+	if _, err = client.GetTranslations(ctx, testAnimeID, "997"); !errors.Is(err, domain.ErrEpisodeNotFound) {
+		t.Fatalf("foreign episode accepted: %v", err)
+	}
+	if episodeCalls.Load() != 2 {
+		t.Fatalf("missing IDs triggered redundant refreshes: %d", episodeCalls.Load())
+	}
+	if menuCalls.Load() != 4 {
 		t.Fatal("ownership failure reached player menu")
 	}
 }

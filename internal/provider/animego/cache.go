@@ -9,6 +9,8 @@ import (
 	"animego/backend/internal/domain"
 )
 
+const ownershipRefreshInterval = time.Second
+
 // WithCatalogCache caches only parsed catalog data, never player menus or media URLs.
 // Zero capacity disables caching. Bounds are validated by NewClient.
 func WithCatalogCache(capacity int, detailsTTL, episodesTTL time.Duration) ClientOption {
@@ -60,6 +62,18 @@ func (c *Client) loadEpisodes(ctx context.Context, anime *animePage) ([]domain.E
 		return c.fetchEpisodes(ctx, anime)
 	}
 	return c.episodes.GetOrLoad(ctx, anime.details.ID, func(ctx context.Context) ([]domain.Episode, error) {
+		return c.fetchEpisodes(ctx, anime)
+	})
+}
+
+func (c *Client) refreshAnime(ctx context.Context, id string) (*animePage, error) {
+	return c.pages.Refresh(ctx, id, ownershipRefreshInterval, func(ctx context.Context) (*animePage, error) {
+		return c.fetchAnime(ctx, id)
+	})
+}
+
+func (c *Client) refreshEpisodes(ctx context.Context, anime *animePage) ([]domain.Episode, error) {
+	return c.episodes.Refresh(ctx, anime.details.ID, ownershipRefreshInterval, func(ctx context.Context) ([]domain.Episode, error) {
 		return c.fetchEpisodes(ctx, anime)
 	})
 }

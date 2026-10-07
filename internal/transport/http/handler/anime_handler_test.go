@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"animego/backend/internal/apperror"
 	"animego/backend/internal/domain"
 	"animego/backend/internal/provider"
 	"animego/backend/internal/service"
@@ -103,6 +104,9 @@ func TestHandlerErrorMapping(t *testing.T) {
 		{&provider.HTTPError{StatusCode: 503, Err: errors.New("private upstream detail")}, 502},
 		{fmt.Errorf("private upstream detail: %w", provider.ErrParsing), 502},
 		{errors.New("private upstream detail"), 500},
+		{context.DeadlineExceeded, 504},
+		{fmt.Errorf("private: %w", &provider.HTTPError{Err: context.DeadlineExceeded}), 504},
+		{apperror.ErrBusy, 503},
 	}
 	for _, tc := range cases {
 		router := httptransport.NewRouter(service.NewAnimeService(fakeProvider{search: func(context.Context, string) ([]domain.Anime, error) { return nil, tc.err }}), logger())

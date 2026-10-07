@@ -1,6 +1,43 @@
-.git
-.tmp
-bin
-.env
-*.exe
-coverage.out
+# Version control and local editor settings
+**/.git
+**/.idea
+**/.vscode
+**/*.swp
+**/*.swo
+**/*~
+
+# Generated skill output, including nested caches
+**/graphify-out
+**/graphity-out
+
+# Local environment; keep shareable examples
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.sample
+!**/.env.template
+
+# Build artifacts, test coverage, and temporary files
+bin/
+dist/
+api
+backend
+coverage/
+**/.tmp
+**/*.exe
+**/*.exe~
+**/*.dll
+**/*.so
+**/*.dylib
+**/*.test
+**/*.prof
+**/coverage.out
+**/coverage-*.out
+**/coverage.html
+**/*.log
+**/*.tmp
+
+# Operating system files
+**/.DS_Store
+**/Thumbs.db
+**/Desktop.ini

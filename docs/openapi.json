@@ -112,6 +112,9 @@
           },
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/CatalogTimeout"
           }
         }
       }
@@ -170,6 +173,9 @@
           },
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/CatalogTimeout"
           }
         }
       }
@@ -224,6 +230,9 @@
           },
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/CatalogTimeout"
           }
         }
       }
@@ -294,6 +303,9 @@
           },
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/CatalogTimeout"
           }
         }
       }
@@ -384,6 +396,9 @@
           },
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/PlaybackTimeout"
           }
         }
       }
@@ -928,7 +943,7 @@
         }
       },
       "CatalogUpstream": {
-        "description": "Ошибка, тайм-аут, слишком большой ответ или неожиданная разметка каталога",
+        "description": "Ошибка, слишком большой ответ или неожиданная разметка каталога",
         "content": {
           "application/json": {
             "schema": {
@@ -945,7 +960,7 @@
         }
       },
       "PlaybackUpstream": {
-        "description": "Ошибка каталога или плеера, тайм-аут либо неожиданный ответ при получении playback",
+        "description": "Ошибка каталога или плеера либо неожиданный ответ при получении playback",
         "content": {
           "application/json": {
             "schema": {
@@ -984,7 +999,7 @@
         }
       },
       "ServiceUnavailable": {
-        "description": "Лимит параллельных запросов исчерпан. Повторите запрос через указанное число секунд.",
+        "description": "Лимит параллельных API-запросов или исходящих запросов к AnimeGO исчерпан. Повторите запрос через указанное число секунд.",
         "headers": {
           "Retry-After": {
             "description": "Число секунд до повторного запроса.",
@@ -1002,6 +1017,37 @@
             "example": {
               "error": "server is busy; retry shortly"
             }
+          }
+        }
+      },
+      "CatalogTimeout": {
+        "description": "Истекло время получения каталога",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": "anime catalog request timed out"
+            }
+          }
+        }
+      },
+      "PlaybackTimeout": {
+        "description": "Истекло время получения источника видео",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": "playback provider request timed out"
+            }
+          }
+        },
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
           }
         }
       }

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"animego/backend/internal/apperror"
 	"animego/backend/internal/domain"
 	"animego/backend/internal/provider"
 	"github.com/gin-gonic/gin"
@@ -29,6 +30,9 @@ func TestPlaybackErrorMapping(t *testing.T) {
 		{domain.ErrUnsupportedPlayer, 422}, {domain.ErrPlaybackUnavailable, 422}, {provider.ErrUpstream, 502}, {provider.ErrParsing, 502},
 		{errors.Join(domain.ErrPlaybackUnavailable, &provider.HTTPError{StatusCode: 403, Err: errors.New("secret-detail")}), 422},
 		{errors.New("secret-detail"), 500},
+		{context.DeadlineExceeded, 504},
+		{&provider.HTTPError{Err: context.DeadlineExceeded}, 504},
+		{apperror.ErrBusy, 503},
 	} {
 		t.Run(http.StatusText(tt.status)+" "+fmtError(tt.err), func(t *testing.T) {
 			r := gin.New()
@@ -40,6 +44,9 @@ func TestPlaybackErrorMapping(t *testing.T) {
 			}
 			if strings.Contains(w.Body.String(), "secret-detail") {
 				t.Fatal("internal error exposed")
+			}
+			if tt.status == 503 && w.Header().Get("Retry-After") != "1" {
+				t.Fatal("busy response missing Retry-After")
 			}
 		})
 	}

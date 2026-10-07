@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"animego/backend/internal/apperror"
 	"animego/backend/internal/cache"
 	"animego/backend/internal/domain"
 	"animego/backend/internal/provider"
@@ -30,6 +31,8 @@ type Client struct {
 	detailsTTL, episodesTTL time.Duration
 	pages                   *cache.Cache[*animePage]
 	episodes                *cache.Cache[[]domain.Episode]
+	requestConcurrency      int
+	requestSlots            chan struct{}
 }
 
 type ClientOption func(*Client)
@@ -71,10 +74,14 @@ func NewClient(baseURL string, httpClient *http.Client, options ...ClientOption)
 		}
 		return nil
 	}
-	c := &Client{baseURL: u, httpClient: &checkedClient, logger: slog.New(slog.NewJSONHandler(io.Discard, nil))}
+	c := &Client{baseURL: u, httpClient: &checkedClient, logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), requestConcurrency: 16}
 	for _, option := range options {
 		option(c)
 	}
+	if c.requestConcurrency <= 0 {
+		return nil, fmt.Errorf("AnimeGO request concurrency must be positive")
+	}
+	c.requestSlots = make(chan struct{}, c.requestConcurrency)
 	if err := c.initializeCache(); err != nil {
 		return nil, err
 	}
@@ -117,6 +124,15 @@ func (c *Client) request(ctx context.Context, path string, query url.Values, opt
 	u := c.baseURL.ResolveReference(&url.URL{Path: path, RawQuery: query.Encode()})
 	if !sameOrigin(c.baseURL, u) {
 		return nil, nil, fmt.Errorf("%w: request outside configured origin rejected", provider.ErrHTTP)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, &provider.HTTPError{Err: err}
+	}
+	select {
+	case c.requestSlots <- struct{}{}:
+		defer func() { <-c.requestSlots }()
+	default:
+		return nil, nil, apperror.ErrBusy
 	}
 	start := time.Now()
 	statusCode := 0

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"animego/backend/internal/domain"
@@ -64,11 +63,12 @@ func (c *manifestCheck) validate(ctx context.Context, source domain.VideoSource,
 	}
 	resolved := source
 	resolved.URL = finalURL
-	if err := ValidateManifest(data, &resolved, requireMaster); err != nil {
+	playlists, err := validateManifest(data, &resolved, requireMaster)
+	if err != nil {
 		return err
 	}
 	if source.Type == domain.VideoHLS {
-		for _, raw := range hlsPlaylists(data, finalURL) {
+		for _, raw := range playlists {
 			child := domain.VideoSource{Type: domain.VideoHLS, URL: raw}
 			if err := c.validate(ctx, child, false, depth+1); err != nil {
 				return err
@@ -85,39 +85,6 @@ func (c *manifestCheck) fetch(ctx context.Context, raw string) ([]byte, string, 
 	}
 	data, err := c.fetcher.Fetch(ctx, raw, MaxManifestBytes)
 	return data, raw, err
-}
-
-// Only playlist references are fetched. Segment and initialization URLs are never fetched.
-func hlsPlaylists(data []byte, rawURL string) []string {
-	base, _ := url.Parse(rawURL)
-	var result []string
-	seen := make(map[string]bool)
-	nextVariant := false
-	add := func(raw string) {
-		ref, err := url.Parse(raw)
-		if err != nil {
-			return
-		} // ValidateManifest already rejected malformed references.
-		raw = base.ResolveReference(ref).String()
-		if !seen[raw] {
-			seen[raw] = true
-			result = append(result, raw)
-		}
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "#EXT-X-STREAM-INF:") {
-			nextVariant = true
-		} else if strings.HasPrefix(line, "#EXT-X-MEDIA:") || strings.HasPrefix(line, "#EXT-X-I-FRAME-STREAM-INF:") {
-			for _, match := range hlsURIAttribute.FindAllStringSubmatch(line, -1) {
-				add(match[1])
-			}
-		} else if line != "" && !strings.HasPrefix(line, "#") && nextVariant {
-			add(line)
-			nextVariant = false
-		}
-	}
-	return result
 }
 
 // AvailableSources preserves provider ordering and the selected episode/translation.

@@ -69,7 +69,9 @@ PLAYER_TIMEOUT=10s
 The multi-stage image contains a static binary and trusted CA certificates,
 runs as a non-root user, and listens on port 8080. Catalog and playback have independent
 concurrency limits; saturated API requests return `503` immediately, while health and docs
-remain accessible. Compose uses a read-only
+remain accessible. Actual AnimeGO requests have a separate shared limit equal to
+`CATALOG_CONCURRENCY + PLAYBACK_CONCURRENCY`; detached cache loads retain their
+slots until the upstream response is closed. Compose uses a read-only
 filesystem and drops Linux capabilities.
 
 ```sh
@@ -130,8 +132,8 @@ Optional fields are omitted when unavailable. An empty search returns
 
 Errors use `{"error":"..."}`: `400` for invalid queries/identifiers, `404` for
 missing anime, episodes, or player tuples (including an episode belonging to another anime),
-`422` for unsupported players or unavailable/protected playback, `503` with `Retry-After: 1` for API concurrency limits, `502` for upstream
-HTTP, timeout, response-size, or parsing failures, and `500` for unexpected
+`422` for unsupported players or unavailable/protected playback, `503` with `Retry-After: 1` for API or upstream concurrency limits, `504` for operation timeouts, `502` for upstream
+HTTP, response-size, or parsing failures, and `500` for unexpected
 internal failures. Details are logged server-side and never sent to clients.
 
 ## Verify
@@ -226,7 +228,8 @@ embed HTML; this host-specific header is not needed on the direct media source.
 
 Unknown players return `422`. Unavailable selected sources, encrypted HLS, or DASH with
 ContentProtection also returns `422`; there is no protected-playback fallback.
-An unexpected provider page/response/manifest or failed upstream request returns `502`.
+An unexpected provider page/response/manifest or failed upstream request returns `502`;
+an operation timeout returns `504`.
 For Kodik and CVH, a failed quality is omitted when another checked quality works;
 request cancellation and deadline failures still stop the entire operation.
 HLS checks include referenced video/audio/subtitle/I-frame playlists with at most 32 manifest
@@ -250,8 +253,10 @@ inside an existing player section produces `502`. Requests are bounded to
 timeout. Parsed anime details and episode lists use bounded in-memory TTL/LRU caches.
 Concurrent misses for the same key share a bounded upstream load; cancelling one caller
 never cancels another caller. Returned values are cloned to prevent accidental cache mutation.
-Episode ownership is checked against the catalog list, refreshing upstream on a cache miss
-for a newly released episode. Removed episodes can remain listed until the episode TTL expires.
+Episode ownership is checked against the catalog list, refreshing upstream when
+the requested episode is missing. Successful refreshes update the cache and are
+shared for one second to bound repeated probes of nonexistent IDs. Removed
+episodes can remain listed until the episode TTL expires.
 Search results, translation menus, embed configuration, and signed media URLs are not cached.
 
 External embed requests require HTTPS and the exact hosts `aniboom.one` or

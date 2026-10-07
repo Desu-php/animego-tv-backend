@@ -43,7 +43,11 @@ func (s *PlaybackService) GetPlayback(ctx context.Context, animeID, episodeID, p
 		attributes := []any{"provider", providerName, "stage", stage, "anime_id", animeID, "episode_id", episodeID, "translation_id", translationID, "media_type", mediaType, "duration", time.Since(start), "status_code", statusCode}
 		if err != nil {
 			attributes = append(attributes, "error", err)
-			s.logger.WarnContext(ctx, "playback resolution failed", attributes...)
+			if errors.Is(err, context.Canceled) {
+				s.logger.InfoContext(ctx, "playback resolution canceled", attributes...)
+			} else {
+				s.logger.WarnContext(ctx, "playback resolution failed", attributes...)
+			}
 		} else {
 			s.logger.InfoContext(ctx, "playback resolved", attributes...)
 		}

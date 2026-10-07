@@ -36,7 +36,11 @@ func run(logger *slog.Logger) error {
 	}
 	client := &http.Client{Timeout: cfg.AnimeGOTimeout}
 	defer client.CloseIdleConnections()
-	upstream, err := animego.NewClient(cfg.AnimeGOBaseURL, client, animego.WithLogger(logger), animego.WithCatalogCache(cfg.CatalogCacheCapacity, cfg.CatalogDetailsTTL, cfg.CatalogEpisodesTTL))
+	upstream, err := animego.NewClient(cfg.AnimeGOBaseURL, client,
+		animego.WithLogger(logger),
+		animego.WithCatalogCache(cfg.CatalogCacheCapacity, cfg.CatalogDetailsTTL, cfg.CatalogEpisodesTTL),
+		animego.WithRequestConcurrency(cfg.CatalogConcurrency+cfg.PlaybackConcurrency),
+	)
 	if err != nil {
 		return fmt.Errorf("initialize AnimeGO provider: %w", err)
 	}

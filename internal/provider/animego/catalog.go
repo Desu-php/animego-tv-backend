@@ -87,12 +87,12 @@ func (c *Client) loadTranslations(ctx context.Context, animeID, episodeID string
 	if !found && c.episodes != nil {
 		// A newly released episode must not wait for the cache TTL to expire.
 		if page.playerPath == "" {
-			page, err = c.fetchAnime(ctx, animeID)
+			page, err = c.refreshAnime(ctx, animeID)
 			if err != nil {
 				return nil, nil, err
 			}
 		}
-		episodes, err = c.fetchEpisodes(ctx, page)
+		episodes, err = c.refreshEpisodes(ctx, page)
 		if err != nil {
 			return nil, nil, fmt.Errorf("refresh episode ownership: %w", err)
 		}

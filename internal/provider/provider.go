@@ -2,9 +2,9 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
+	"animego/backend/internal/apperror"
 	"animego/backend/internal/domain"
 )
 
@@ -17,7 +17,7 @@ type AnimeProvider interface {
 }
 
 var (
-	ErrUpstream                 = errors.New("upstream provider failure")
+	ErrUpstream                 = apperror.ErrUpstream
 	ErrHTTP                     = fmt.Errorf("%w: HTTP failure", ErrUpstream)
 	ErrParsing                  = fmt.Errorf("%w: parsing failure", ErrUpstream)
 	ErrUpstreamStructureChanged = ErrParsing
